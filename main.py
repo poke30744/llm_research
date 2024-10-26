@@ -1,30 +1,61 @@
+import typer
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from threading import Thread
+from transformers import TextIteratorStreamer
 
-# 模型名称
-model_name = "meta-llama/Llama-2-7b-hf"
+def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
+         system_prompt: str="You are a helpful assistant."
+         ):
+    
+    MAX_INPUT_TOKEN_LENGTH = 131072
 
-# 加载模型和分词器
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+       model_name,
+        torch_dtype=torch.float16,
+        device_map="auto")
+    
+    #chat_history = []
+    conversation = []
+    if system_prompt:
+        conversation.append({"role": "system", "content": system_prompt})
+    
+    while True:
+        message: str = input("Ready: ")
+        conversation.append({"role": "user", "content": message})
 
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    torch_dtype=torch.float16,  # 使用低精度推理
-    device_map="auto"  # 自动分配设备 (CPU 或 MPS)
-)
+        input_ids = tokenizer.apply_chat_template(conversation, return_tensors="pt")
+        if input_ids.shape[1] > MAX_INPUT_TOKEN_LENGTH:
+            input_ids = input_ids[:, -MAX_INPUT_TOKEN_LENGTH:]
+            print(f"Trimmed input from conversation as it was longer than {MAX_INPUT_TOKEN_LENGTH} tokens.")
+        input_ids = input_ids.to(model.device)
 
-# 检查 MPS (Metal 后端) 是否可用
-device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
-model.to(device)
+        streamer = TextIteratorStreamer(tokenizer, timeout=10.0, skip_prompt=True, skip_special_tokens=True)
+        generate_kwargs = dict(
+            {"input_ids": input_ids},
+            streamer=streamer,
+            max_new_tokens=1024,
+            do_sample=True,
+            top_p=0.8,
+            top_k=10,
+            temperature=0.2,
+            num_beams=1,
+            repetition_penalty=1.2,
+        )
 
-# 输入测试
-input_text = "What is the meaning of life?"
-inputs = tokenizer(input_text, return_tensors="pt").to(device)
+        t = Thread(target=model.generate, kwargs=generate_kwargs)
+        t.start()
 
-# 模型推理
-with torch.no_grad():  # 禁用梯度计算
-    outputs = model.generate(inputs["input_ids"], max_length=50)
+        try:
+            outputs = []
+            for text in streamer:
+                outputs.append(text)
+                print(text, end="", flush=True)
+        finally:
+            t.join()
+        print()
+        conversation.append({"role": "assistant", "content": ''.join(outputs)})
 
-# 解码输出
-output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-print(output_text)
+if __name__ == "__main__":
+    typer.run(main)
