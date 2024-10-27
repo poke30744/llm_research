@@ -3,6 +3,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from threading import Thread
 from transformers import TextIteratorStreamer
+import readline # optional, will allow Up/Down/History in the console
 
 def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
          system_prompt: str="You are a helpful assistant."
