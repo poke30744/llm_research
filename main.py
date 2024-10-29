@@ -6,14 +6,16 @@ from transformers import TextIteratorStreamer
 import readline # optional, will allow Up/Down/History in the console
 
 def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
-         system_prompt: str="You are a helpful assistant."
+         system_prompt: str="You are a helpful assistant.",
+         disable_sample: bool=False,
+         disable_chat: bool=False,
          ):
     
     MAX_INPUT_TOKEN_LENGTH = 131072
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
-       model_name,
+        model_name,
         torch_dtype=torch.float16,
         device_map="auto")
     
@@ -37,7 +39,7 @@ def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
             {"input_ids": input_ids},
             streamer=streamer,
             max_new_tokens=1024,
-            do_sample=True,
+            do_sample=not disable_sample,
             top_p=0.8,
             top_k=10,
             temperature=0.2,
@@ -56,7 +58,10 @@ def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
         finally:
             t.join()
         print()
-        conversation.append({"role": "assistant", "content": ''.join(outputs)})
+        if not disable_chat:
+            conversation.append({"role": "assistant", "content": ''.join(outputs)})
+        else:
+            conversation = [{"role": "system", "content": system_prompt}]
 
 if __name__ == "__main__":
     typer.run(main)
