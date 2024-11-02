@@ -7,8 +7,8 @@ import readline # optional, will allow Up/Down/History in the console
 
 def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
          system_prompt: str="You are a helpful assistant.",
-         disable_sample: bool=False,
-         disable_chat: bool=False,
+         do_sample: bool=True,
+         chat_mode: bool=True,
          ):
     
     MAX_INPUT_TOKEN_LENGTH = 131072
@@ -39,7 +39,7 @@ def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
             {"input_ids": input_ids},
             streamer=streamer,
             max_new_tokens=1024,
-            do_sample=not disable_sample,
+            do_sample=do_sample,
             top_p=0.8,
             top_k=10,
             temperature=0.2,
@@ -58,7 +58,7 @@ def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
         finally:
             t.join()
         print()
-        if not disable_chat:
+        if chat_mode:
             conversation.append({"role": "assistant", "content": ''.join(outputs)})
         else:
             conversation = [{"role": "system", "content": system_prompt}]
