@@ -17,7 +17,8 @@ def main(model_name: str="Qwen/Qwen2-1.5B-Instruct",
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch.float16,
-        device_map="auto")
+        device_map="auto",
+        use_cache=True)
     
     #chat_history = []
     conversation = []
